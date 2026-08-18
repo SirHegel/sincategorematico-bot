@@ -10,6 +10,7 @@ from pathlib import Path
 import secrets
 import time
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .config import load_config
 from .storage import StateStore
@@ -73,8 +74,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "paused": store.get_bool("publishing_paused", default=True),
                 "owner": store.get_int("owner_user_id") is not None,
                 "initialized": store.get_bool("telegram_initialized"),
-                "max_posts": config.max_posts_per_day,
-                "timezone": config.timezone,
+                "max_posts": store.get_int("max_posts_per_day") or config.max_posts_per_day,
+                "timezone": store.get("timezone") or config.timezone,
                 "activity": store.recent_activity(),
             }
             store.close()
@@ -128,6 +129,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
             store.add_activity("control", f"Publicaciones {'pausadas' if paused else 'reanudadas'} desde panel web")
             store.close()
             self._json({"ok": True, "paused": paused})
+            return
+        if path == "/api/settings":
+            if not self._authenticated():
+                self._json({"error": "Sesión requerida"}, HTTPStatus.UNAUTHORIZED)
+                return
+            data = self._read_json()
+            try:
+                max_posts = int(data.get("max_posts", 0))
+                timezone = str(data.get("timezone", "")).strip()
+                if not 1 <= max_posts <= 50:
+                    raise ValueError
+                ZoneInfo(timezone)
+            except (TypeError, ValueError, ZoneInfoNotFoundError):
+                self._json({"error": "Usa un límite de 1 a 50 y una zona horaria válida"}, HTTPStatus.BAD_REQUEST)
+                return
+            store = StateStore(STATE)
+            store.set("max_posts_per_day", max_posts)
+            store.set("timezone", timezone)
+            store.add_activity("settings", f"Configuración actualizada: {max_posts} piezas/día · {timezone}")
+            store.close()
+            self._json({"ok": True})
             return
         self.send_error(HTTPStatus.NOT_FOUND)
 

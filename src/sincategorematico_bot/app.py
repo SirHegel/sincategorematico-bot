@@ -174,6 +174,7 @@ class BotApplication:
 
     def _handle_status(self, identity: Identity) -> None:
         paused = self.store.get_bool("publishing_paused", default=True)
+        daily_limit = self.store.get_int("max_posts_per_day") or self.config.max_posts_per_day
         uptime_seconds = int(time.monotonic() - self.started_at)
         hours, remainder = divmod(uptime_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -182,7 +183,7 @@ class BotApplication:
             "Estado: en línea\n"
             f"Publicaciones: {'pausadas' if paused else 'habilitadas'}\n"
             f"Tiempo activo: {hours:02d}:{minutes:02d}:{seconds:02d}\n"
-            f"Límite diario configurado: {self.config.max_posts_per_day}",
+            f"Límite diario configurado: {daily_limit}",
         )
 
     def _handle_pause(self, identity: Identity) -> None:

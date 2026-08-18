@@ -50,6 +50,12 @@ class DesktopApp(tk.Tk):
         ttk.Label(controls, text="Los cambios se reflejan también en Telegram.", style="Card.TLabel", foreground="#9399b2", wraplength=280).pack(anchor="w", pady=(8, 28))
         ttk.Button(controls, text="▶  Reanudar flujo", style="Primary.TButton", command=lambda: self.control(False)).pack(fill="x", pady=5)
         ttk.Button(controls, text="Ⅱ  Pausar publicaciones", style="Secondary.TButton", command=lambda: self.control(True)).pack(fill="x", pady=5)
+        ttk.Label(controls, text="CONFIGURACIÓN", style="Card.TLabel", foreground="#9399b2", font=("Sans", 9, "bold")).pack(anchor="w", pady=(24, 8))
+        self.max_posts = tk.IntVar(value=4)
+        self.timezone = tk.StringVar(value="America/Bogota")
+        tk.Spinbox(controls, from_=1, to=50, textvariable=self.max_posts, bg="#101322", fg="white", buttonbackground="#242841", relief="flat").pack(fill="x", pady=4)
+        ttk.Entry(controls, textvariable=self.timezone).pack(fill="x", pady=4)
+        ttk.Button(controls, text="✓  Guardar configuración", style="Primary.TButton", command=self.save_settings).pack(fill="x", pady=5)
         ttk.Button(controls, text="↻  Actualizar", style="Secondary.TButton", command=self.refresh).pack(fill="x", pady=(28, 5))
         activity = ttk.Frame(body, style="Card.TFrame", padding=24); activity.pack(side="left", fill="both", expand=True)
         ttk.Label(activity, text="ACTIVIDAD RECIENTE", style="Card.TLabel", font=("Sans", 18, "bold")).pack(anchor="w")
@@ -60,11 +66,20 @@ class DesktopApp(tk.Tk):
         store = StateStore(STATE); store.set("publishing_paused", paused)
         store.add_activity("control", f"Publicaciones {'pausadas' if paused else 'reanudadas'} desde aplicación local"); store.close(); self.refresh()
 
+    def save_settings(self) -> None:
+        maximum = max(1, min(50, int(self.max_posts.get())))
+        timezone = self.timezone.get().strip() or "America/Bogota"
+        store = StateStore(STATE); store.set("max_posts_per_day", maximum); store.set("timezone", timezone)
+        store.add_activity("settings", f"Configuración actualizada: {maximum} piezas/día · {timezone}"); store.close(); self.refresh()
+
     def refresh(self) -> None:
         config, store = load_config(CONFIG), StateStore(STATE)
         self.values[0].set("Conectado" if store.get_bool("telegram_initialized") else "Pendiente")
         self.values[1].set("En pausa" if store.get_bool("publishing_paused", default=True) else "En marcha")
-        self.values[2].set(f"{config.max_posts_per_day} piezas")
+        effective_max = store.get_int("max_posts_per_day") or config.max_posts_per_day
+        effective_timezone = store.get("timezone") or config.timezone
+        self.values[2].set(f"{effective_max} piezas")
+        self.max_posts.set(effective_max); self.timezone.set(effective_timezone)
         self.activity.delete(0, tk.END)
         for item in store.recent_activity(30):
             stamp = datetime.fromtimestamp(int(item["created_at"])).strftime("%d/%m · %H:%M")
