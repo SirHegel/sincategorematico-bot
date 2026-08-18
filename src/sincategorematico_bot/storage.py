@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sqlite3
+import time
 
 
 class StateStore:
@@ -16,6 +17,16 @@ class StateStore:
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            )
+            """
+        )
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS activity (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                message TEXT NOT NULL
             )
             """
         )
@@ -51,6 +62,23 @@ class StateStore:
             (key, serialized),
         )
         self._connection.commit()
+
+    def add_activity(self, kind: str, message: str) -> None:
+        self._connection.execute(
+            "INSERT INTO activity(created_at, kind, message) VALUES(?, ?, ?)",
+            (int(time.time()), kind[:32], message[:240]),
+        )
+        self._connection.execute(
+            "DELETE FROM activity WHERE id NOT IN (SELECT id FROM activity ORDER BY id DESC LIMIT 200)"
+        )
+        self._connection.commit()
+
+    def recent_activity(self, limit: int = 20) -> list[dict[str, int | str]]:
+        rows = self._connection.execute(
+            "SELECT created_at, kind, message FROM activity ORDER BY id DESC LIMIT ?",
+            (max(1, min(limit, 100)),),
+        ).fetchall()
+        return [{"created_at": int(row[0]), "kind": str(row[1]), "message": str(row[2])} for row in rows]
 
     def close(self) -> None:
         self._connection.close()

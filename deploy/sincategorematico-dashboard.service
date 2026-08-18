@@ -1,0 +1,28 @@
+[Unit]
+Description=Panel web local de Sincategoremático
+After=network.target sincategorematico-bot.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/sirhegel/Documentos/Repos/sincategorematico-bot
+EnvironmentFile=/home/sirhegel/.config/sincategorematico-bot/bot.env
+Environment=PYTHONPATH=/home/sirhegel/Documentos/Repos/sincategorematico-bot/src
+Environment=SINCATEGOREMATICO_CONFIG_PATH=/home/sirhegel/Documentos/Repos/sincategorematico-bot/config.toml
+Environment=SINCATEGOREMATICO_STATE_PATH=/home/sirhegel/.local/state/sincategorematico-bot/state.db
+ExecStart=/usr/bin/python3 -m sincategorematico_bot.dashboard
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/sirhegel/.local/state/sincategorematico-bot
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+MemoryMax=256M
+
+[Install]
+WantedBy=default.target

@@ -149,6 +149,7 @@ class BotApplication:
         self.store.set("owner_user_id", identity.user_id)
         self.store.set("owner_chat_id", identity.chat_id)
         self.store.set("claim_consumed_at", int(time.time()))
+        self.store.add_activity("security", "Propietario de Telegram vinculado")
         LOGGER.info("Propietario vinculado correctamente")
         self.api.send_message(
             identity.chat_id,
@@ -186,8 +187,10 @@ class BotApplication:
 
     def _handle_pause(self, identity: Identity) -> None:
         self.store.set("publishing_paused", True)
+        self.store.add_activity("control", "Publicaciones pausadas desde Telegram")
         self.api.send_message(identity.chat_id, "Publicaciones pausadas.")
 
     def _handle_resume(self, identity: Identity) -> None:
         self.store.set("publishing_paused", False)
+        self.store.add_activity("control", "Publicaciones reanudadas desde Telegram")
         self.api.send_message(identity.chat_id, "Publicaciones habilitadas.")

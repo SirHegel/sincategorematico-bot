@@ -41,6 +41,28 @@ journalctl --user -u sincategorematico-bot.service -f
 systemctl --user restart sincategorematico-bot.service
 ```
 
+## Paneles locales
+
+El proyecto incluye dos interfaces que comparten el estado privado del bot:
+
+- **Panel web local:** disponible únicamente en `http://127.0.0.1:8765`, con
+  autenticación, cookie `HttpOnly`, validación de origen, límite de intentos y
+  una política CSP restrictiva. No se expone a Internet.
+- **Aplicación de escritorio:** interfaz nativa instalada en el menú de
+  aplicaciones del computador como **Sincategoremático**.
+
+La clave del panel web vive junto al token de Telegram en el archivo privado
+`~/.config/sincategorematico-bot/bot.env`; no forma parte del repositorio. Para
+instalar o regenerar la configuración local:
+
+```bash
+python3 scripts/configure_dashboard.py
+```
+
+Ambas interfaces permiten consultar el estado, comprobar la vinculación del
+propietario, pausar o reanudar el flujo y revisar la actividad reciente. Nunca
+muestran el token de Telegram ni la clave del panel.
+
 Bloquear la pantalla no detiene el servicio. Suspender, hibernar o apagar el
 equipo sí lo detiene. Para que arranque antes de iniciar sesión se debe habilitar
 `linger` una sola vez.

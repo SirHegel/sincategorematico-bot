@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090b18"><title>Sincategoremático · Centro de control</title>
+  <link rel="icon" href="/logo.svg"><link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <main class="shell">
+    <header><a class="brand" href="/"><img src="/logo.svg" alt=""><span><b>Sincategoremático</b><small>Inteligencia editorial</small></span></a><div class="secure"><i></i> Sólo dispositivo local</div></header>
+    <section class="login panel" id="login"><div><p class="eyebrow">ACCESO PROTEGIDO</p><h1>Tu operación, bajo control.</h1><p>Introduce la clave privada del panel. Nunca se envía fuera de este equipo.</p></div><form id="login-form"><label>Clave del panel<input id="token" type="password" minlength="24" required autocomplete="current-password" placeholder="••••••••••••••••••••••••"></label><button>Entrar al centro de control <span>→</span></button><p id="login-error" role="alert"></p></form></section>
+    <section class="dashboard" id="dashboard" hidden>
+      <div class="hero"><div><p class="eyebrow">CENTRO DE OPERACIONES</p><h1>Todo fluye desde aquí.</h1><p>Supervisa Telegram, el motor editorial y la cola de publicación sin exponer credenciales.</p></div><div class="hero-mark"><img src="/logo.svg" alt="Logotipo de Sincategoremático"></div></div>
+      <div class="metrics">
+        <article><span class="metric-icon violet">◈</span><small>BOT TELEGRAM</small><strong id="bot-state">—</strong><p id="owner-state">Comprobando propietario</p></article>
+        <article><span class="metric-icon green">●</span><small>PUBLICACIONES</small><strong id="publish-state">—</strong><p>Control global de la automatización</p></article>
+        <article><span class="metric-icon blue">↗</span><small>LÍMITE DIARIO</small><strong id="max-posts">—</strong><p id="timezone">Zona horaria</p></article>
+      </div>
+      <div class="content-grid">
+        <section class="panel controls"><div><p class="eyebrow">CONTROL INMEDIATO</p><h2>Motor editorial</h2><p>Pausa o reactiva el flujo. Los cambios también se reflejan en Telegram.</p></div><div class="control-actions"><button id="resume" class="primary">Reanudar flujo <span>▶</span></button><button id="pause" class="secondary">Pausar publicaciones <span>Ⅱ</span></button></div></section>
+        <section class="panel activity"><div class="section-title"><div><p class="eyebrow">TRAZABILIDAD</p><h2>Actividad reciente</h2></div><button id="refresh" class="icon-button" aria-label="Actualizar">↻</button></div><ol id="activity-list"></ol></section>
+      </div>
+      <footer><span><i></i> Conexión privada dentro del dispositivo</span><span>Sin tokens visibles · Sin telemetría externa</span></footer>
+    </section>
+  </main>
+</body></html>
