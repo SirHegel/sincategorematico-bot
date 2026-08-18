@@ -1,0 +1,9 @@
+[bot]
+display_name = "Sincategoremático"
+timezone = "America/Bogota"
+poll_timeout_seconds = 25
+max_retry_seconds = 60
+
+[publishing]
+paused_by_default = true
+max_posts_per_day = 4
