@@ -16,8 +16,10 @@ CONFIG = Path(os.environ.get("SINCATEGOREMATICO_CONFIG_PATH", ROOT / "config.tom
 
 class DesktopApp(tk.Tk):
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(className="Sincategorematico")
         self.title("Sincategoremático · Centro de control")
+        self._app_icon = tk.PhotoImage(file=ROOT / "web/logo.png")
+        self.iconphoto(True, self._app_icon)
         self.geometry("1060x700")
         self.minsize(760, 560)
         self.configure(bg="#080a15")

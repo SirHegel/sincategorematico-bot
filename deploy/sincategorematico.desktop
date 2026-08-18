@@ -3,7 +3,8 @@ Type=Application
 Name=Sincategoremático
 Comment=Centro local de operaciones editoriales
 Exec=/usr/bin/env PYTHONPATH=/home/sirhegel/Documentos/Repos/sincategorematico-bot/src /usr/bin/python3 -m sincategorematico_bot.desktop
-Icon=/home/sirhegel/Documentos/Repos/sincategorematico-bot/web/logo.svg
+Icon=/home/sirhegel/Documentos/Repos/sincategorematico-bot/web/logo.png
 Terminal=false
 Categories=Utility;Network;
 StartupNotify=true
+StartupWMClass=Sincategorematico
