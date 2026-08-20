@@ -163,7 +163,7 @@ form button,
   width: 100%;
   padding: 16px 20px;
   border-radius: 14px;
-  background: linear-gradient(120deg, #6a5cff, #8872ff);
+  background: linear-gradient(120deg, #6a5cff, #7260e8);
   box-shadow: 0 12px 30px rgba(101, 89, 255, 0.25);
 }
 #login-error {
@@ -455,14 +455,6 @@ footer {
   footer {
     display: grid;
     gap: 8px;
-  }
-  .settings,
-  .settings form {
-    grid-template-columns: 1fr;
-  }
-  .settings form button,
-  .settings form p {
-    grid-column: auto;
   }
 }
 .settings {

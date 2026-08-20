@@ -64,6 +64,19 @@ class TemplateInstallationTests(unittest.TestCase):
             finally:
                 store.close()
 
+    def test_linkedin_client_id_rejects_prose_and_urls(self) -> None:
+        self.assertTrue(linkedin_configurator.plausible_client_id("86abcD9_xyz-12"))
+        self.assertFalse(
+            linkedin_configurator.plausible_client_id(
+                "hazlo automatico usando mi perfil abierto"
+            )
+        )
+        self.assertFalse(
+            linkedin_configurator.plausible_client_id(
+                "https://www.linkedin.com/developers/apps"
+            )
+        )
+
     def test_render_is_atomic_idempotent_and_canonicalizes_mode(self) -> None:
         with tempfile.TemporaryDirectory() as raw_directory:
             directory = Path(raw_directory)

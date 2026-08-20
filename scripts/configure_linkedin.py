@@ -7,6 +7,7 @@ import html
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import os
 from pathlib import Path
+import re
 import secrets
 import subprocess
 import sys
@@ -34,6 +35,7 @@ from sincategorematico_bot.storage import StateStore  # noqa: E402
 CLIENT_ID_KEY = "SINCATEGOREMATICO_LINKEDIN_CLIENT_ID"
 CLIENT_SECRET_KEY = "SINCATEGOREMATICO_LINKEDIN_CLIENT_SECRET"
 DEFAULT_PORT = 8770
+CLIENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9._~-]{3,200}$")
 STATE_PATH = Path(
     os.environ.get(
         "SINCATEGOREMATICO_STATE_PATH",
@@ -117,6 +119,12 @@ def ask(prompt: str, *, current: str = "", secret: bool = False) -> str:
     return value or current
 
 
+def plausible_client_id(value: str) -> bool:
+    """Reject prose/URLs before asking for a secret in the credential wizard."""
+
+    return bool(CLIENT_ID_PATTERN.fullmatch(value.strip()))
+
+
 def wait_for_callback(port: int, state: str, *, timeout: int = 300) -> dict[str, str]:
     CallbackHandler.received = {}
     CallbackHandler.expected_state = state
@@ -151,8 +159,20 @@ def main() -> int:
         print(f"No fue posible poner el motor en modo seguro: {exc}", file=sys.stderr)
         return 2
 
+    print(
+        "Esta ventana configura credenciales; no es el chat de Orquesta.\n"
+        "Necesitas el Client ID y Client Secret de una app en LinkedIn Developers.\n"
+        "La sesión abierta de LinkedIn no sustituye esas dos credenciales.\n"
+    )
     values = read_environment(ENV_PATH)
     client_id = ask("Client ID de la app de LinkedIn", current=values.get(CLIENT_ID_KEY, ""))
+    if not plausible_client_id(client_id):
+        print(
+            "Ese valor no parece un Client ID. Copia únicamente el identificador "
+            "de la app, sin espacios ni instrucciones.",
+            file=sys.stderr,
+        )
+        return 2
     client_secret = ask(
         "Client Secret", current=values.get(CLIENT_SECRET_KEY, ""), secret=True
     )
