@@ -27,7 +27,7 @@ from .runtime import (
 )
 from .sources import FeedError, fetch_feed
 from .storage import StateStore
-from .writer import ClaudeWriter, WriterError
+from .writer import ClaudeWriter, WriterAccountsUnavailable, WriterError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -198,10 +198,11 @@ class Engine:
         counts = self.store.count_by_state()
         return counts.get("pending", 0) + counts.get("approved", 0)
 
-    def pause_writer(self, reason: str) -> None:
+    def pause_writer(self, reason: str, *, seconds: int = WRITER_COOLDOWN_SECONDS) -> None:
         """Aparta la redacción un rato para no insistir contra una CLI caída."""
-        self._writer_ready_at = time.monotonic() + WRITER_COOLDOWN_SECONDS
-        LOGGER.warning("Redacción en espera %s s: %s", WRITER_COOLDOWN_SECONDS, reason)
+        delay = max(1, int(seconds))
+        self._writer_ready_at = time.monotonic() + delay
+        LOGGER.warning("Redacción en espera %s s: %s", delay, reason)
 
     def compose_next(self) -> bool:
         if time.monotonic() < self._writer_ready_at:
@@ -231,6 +232,11 @@ class Engine:
                 link=link or "(sin enlace: encargo directo)",
                 source=str(item["source_name"] or "encargo del propietario"),
             )
+        except WriterAccountsUnavailable as exc:
+            # La noticia no causó el fallo. No consumir sus intentos ni descartarla
+            # mientras las cuentas esperan recarga, autenticación o un lock compartido.
+            self.pause_writer(str(exc), seconds=exc.retry_after_seconds)
+            return False
         except WriterError as exc:
             attempts = self.store.bump_item_attempts(item_id)
             self.pause_writer(str(exc))

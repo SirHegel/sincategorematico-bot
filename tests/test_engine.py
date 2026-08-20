@@ -20,7 +20,7 @@ from sincategorematico_bot.linkedin import LinkedInClient, LinkedInError, TokenB
 from sincategorematico_bot.sources import FeedEntry, FeedError, FeedResult
 from sincategorematico_bot.runtime import apply_defaults
 from sincategorematico_bot.storage import StateStore
-from sincategorematico_bot.writer import Draft, WriterError
+from sincategorematico_bot.writer import Draft, WriterAccountsUnavailable, WriterError
 
 
 def setUpModule() -> None:
@@ -180,6 +180,28 @@ class ComposeTests(EngineTestCase):
         # La espera evita insistir contra una CLI caída en cada ciclo.
         self.assertFalse(self.engine.compose_next())
         self.assertEqual(self.engine.writer.calls, 1)
+
+    def test_unavailable_accounts_pause_without_consuming_the_news_attempts(self) -> None:
+        self.engine.writer = StubWriter(
+            error=WriterAccountsUnavailable(
+                "todas las cuentas esperan recarga",
+                retry_after_seconds=120,
+            )
+        )
+        self.add_news()
+
+        for _ in range(engine_module.MAX_COMPOSE_ATTEMPTS + 1):
+            self.engine._writer_ready_at = 0.0
+            self.assertFalse(self.engine.compose_next())
+
+        item = self.store.next_item(max_age_seconds=48 * 3600)
+        self.assertIsNotNone(item)
+        self.assertEqual(item["state"], "new")
+        self.assertEqual(item["attempts"], 0)
+        self.assertEqual(
+            self.engine.writer.calls,
+            engine_module.MAX_COMPOSE_ATTEMPTS + 1,
+        )
 
     def test_the_news_is_dropped_after_repeated_failures(self) -> None:
         self.engine.writer = StubWriter(error=WriterError("la CLI no respondió"))

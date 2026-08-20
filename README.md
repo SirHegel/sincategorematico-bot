@@ -42,6 +42,60 @@ No copies esos archivos al repositorio, a un issue ni a un registro público.
   correspondientes al perfil personal o a la organización elegida.
 - Tkinter es opcional y solo se necesita para la aplicación de escritorio.
 
+## Varias cuentas de Claude para redacción
+
+Sin configuración adicional, el motor conserva el comportamiento original y usa la
+cuenta Claude predeterminada de la sesión. Opcionalmente puede recibir una lista
+ordenada de cuentas locales: si una alcanza su cuota o pierde la autenticación, prueba
+la siguiente con exactamente el mismo encargo. Un límite de cuenta no consume los
+intentos de la noticia ni provoca que se descarte.
+
+Las cuentas se ejecutan siempre con el mismo aislamiento del redactor: directorio
+temporal, `--safe-mode`, sin persistencia de sesión, Chrome, herramientas ni servidores
+MCP, y con un entorno que excluye los secretos del bot. El cambio de cuenta solo
+modifica `CLAUDE_CONFIG_DIR`; no integra un agente u orquestador con acceso al equipo.
+
+Los directorios deben existir, pertenecer al usuario actual, tener modo `0700`, estar
+ya autenticados y usar rutas absolutas canónicas. Regístralos sin copiar ni leer sus
+credenciales:
+
+```bash
+python3 scripts/configure_writers.py \
+  --account principal="$HOME/.local/state/claude-principal" \
+  --account reserva="$HOME/.local/state/claude-reserva"
+```
+
+El configurador escribe de forma atómica dos archivos locales:
+
+- `~/.config/sincategorematico-bot/writers.json`, modo `0600`, que solo contiene
+  identificadores y rutas.
+- `~/.config/systemd/user/sincategorematico-engine.service.d/writer-accounts.conf`,
+  modo `0644`, que concede escritura únicamente en los directorios escogidos y,
+  si se configuró, en el archivo de bloqueo compartido exacto.
+
+No ejecuta `systemctl`. Revisa ambos archivos y, cuando corresponda, aplica la
+configuración manualmente:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart sincategorematico-engine.service
+```
+
+Se recomiendan cuentas dedicadas al motor. Si otro proceso necesita compartir una,
+ambos deben respetar el mismo archivo `flock`. Su directorio padre debe existir,
+pertenecer al usuario y tener modo `0700`; si el archivo aún no existe, el configurador
+lo crea de forma exclusiva con modo `0600`:
+
+```bash
+python3 scripts/configure_writers.py \
+  --account compartida="$HOME/.local/state/claude-compartida" \
+  --account reserva="$HOME/.local/state/claude-reserva" \
+  --shared-lock compartida="$HOME/.local/state/coordinacion/claude.lock"
+```
+
+El lock no se entrega a Claude ni aparece en el prompt. Si el otro consumidor no usa
+ese mismo lock, configura una cuenta dedicada en vez de compartir el directorio.
+
 ## Instalación desde GitHub
 
 Clona en una ruta estable del usuario; no hacen falta rutas particulares ni
