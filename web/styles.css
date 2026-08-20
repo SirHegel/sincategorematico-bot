@@ -135,7 +135,8 @@ label {
   font-size: 13px;
   font-weight: 700;
 }
-input {
+input,
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -144,7 +145,8 @@ input {
   color: white;
   outline: none;
 }
-input:focus {
+input:focus,
+select:focus {
   border-color: var(--violet);
   box-shadow: 0 0 0 4px rgba(118, 101, 255, 0.13);
 }
@@ -187,7 +189,7 @@ form button,
 }
 .metrics {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -310,6 +312,102 @@ footer {
   color: var(--muted);
   font-size: 11px;
 }
+
+.gate {
+  margin: 0 0 16px;
+  padding: 14px 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(22, 26, 48, 0.6);
+  color: var(--muted);
+  font-size: 13px;
+}
+.counters {
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+}
+.counters li {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+}
+.counters b {
+  color: var(--text);
+  font-size: 15px;
+}
+.pill {
+  align-self: center;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.queue {
+  margin-top: 16px;
+}
+.queue li {
+  display: block;
+  padding: 20px 0;
+}
+.queue li.empty {
+  color: var(--muted);
+}
+.draft-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.draft-head b {
+  font-size: 15px;
+}
+.draft p {
+  margin: 12px 0 0;
+  color: #c7cbe0;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+.draft a {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--blue);
+  font-size: 12px;
+  word-break: break-all;
+}
+.draft-error {
+  display: block;
+  margin-top: 10px;
+  color: #ff8094;
+  font-size: 12px;
+}
+.draft-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.draft-actions button {
+  width: auto;
+  margin: 0;
+  padding: 11px 22px;
+  border-radius: 12px;
+}
+.draft.published .pill {
+  color: var(--green);
+  border-color: rgba(29, 217, 170, 0.4);
+}
+.draft.failed .pill {
+  color: #ff8094;
+  border-color: rgba(255, 128, 148, 0.4);
+}
+@media (max-width: 1000px) {
+  .metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 760px) {
   .shell {
     width: min(100% - 24px, 1180px);

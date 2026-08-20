@@ -20,6 +20,14 @@ class TelegramAPIError(RuntimeError):
         self.retry_after = retry_after
 
 
+def _keyboard(buttons: list[list[tuple[str, str]]]) -> dict[str, Any]:
+    return {
+        "inline_keyboard": [
+            [{"text": label, "callback_data": data} for label, data in row] for row in buttons
+        ]
+    }
+
+
 class TelegramAPI:
     def __init__(self, token: str, *, network_timeout: int = 35) -> None:
         if not token or ":" not in token:
@@ -38,7 +46,7 @@ class TelegramAPI:
         request = Request(
             f"{self._base_url}/{method}",
             data=encoded,
-            headers={"User-Agent": "sincategorematico-bot/0.1"},
+            headers={"User-Agent": "sincategorematico-bot/0.2"},
             method="POST",
         )
         try:
@@ -101,6 +109,19 @@ class TelegramAPI:
         commands = [
             {"command": "start", "description": "Abrir el panel del bot"},
             {"command": "status", "description": "Ver el estado del servicio"},
+            {"command": "cola", "description": "Borradores en espera"},
+            {"command": "ver", "description": "Ver un borrador completo"},
+            {"command": "tema", "description": "Encargar una publicación sobre un tema"},
+            {"command": "fuentes", "description": "Listar las fuentes de noticias"},
+            {"command": "agregar", "description": "Añadir una fuente RSS"},
+            {"command": "quitar", "description": "Quitar una fuente por número"},
+            {"command": "limite", "description": "Fijar las piezas por día"},
+            {"command": "franja", "description": "Fijar la franja horaria"},
+            {"command": "aprobacion", "description": "Alternar aprobación manual"},
+            {"command": "publicacion", "description": "Cambiar entre simulación y real"},
+            {"command": "linkedin", "description": "Estado de la cuenta de LinkedIn"},
+            {"command": "reintentar", "description": "Reintentar tras verificar LinkedIn"},
+            {"command": "confirmar", "description": "Confirmar un envío incierto ya publicado"},
             {"command": "pause", "description": "Pausar publicaciones"},
             {"command": "resume", "description": "Reanudar publicaciones"},
             {"command": "help", "description": "Mostrar ayuda"},
@@ -113,18 +134,47 @@ class TelegramAPI:
             {
                 "offset": offset,
                 "timeout": poll_timeout,
-                "allowed_updates": json.dumps(["message"]),
+                "allowed_updates": json.dumps(["message", "callback_query"]),
             },
             timeout=poll_timeout + 10,
         )
         return list(result or [])
 
-    def send_message(self, chat_id: int, text: str) -> dict[str, Any]:
-        return self.call(
-            "sendMessage",
-            {
-                "chat_id": chat_id,
-                "text": text,
-                "disable_web_page_preview": "true",
-            },
-        )
+    def send_message(
+        self,
+        chat_id: int,
+        text: str,
+        *,
+        buttons: list[list[tuple[str, str]]] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+            "text": text[:4096],
+            "disable_web_page_preview": "true",
+        }
+        if buttons:
+            payload["reply_markup"] = json.dumps(_keyboard(buttons))
+        return self.call("sendMessage", payload)
+
+    def edit_message_text(
+        self,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        *,
+        buttons: list[list[tuple[str, str]]] | None = None,
+    ) -> Any:
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text[:4096],
+            "disable_web_page_preview": "true",
+        }
+        payload["reply_markup"] = json.dumps(_keyboard(buttons) if buttons else {"inline_keyboard": []})
+        return self.call("editMessageText", payload)
+
+    def answer_callback_query(self, callback_id: str, text: str = "") -> Any:
+        payload: dict[str, Any] = {"callback_query_id": callback_id}
+        if text:
+            payload["text"] = text[:200]
+        return self.call("answerCallbackQuery", payload)

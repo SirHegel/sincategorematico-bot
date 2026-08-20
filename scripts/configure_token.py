@@ -83,12 +83,33 @@ def main() -> int:
     print(f"Token validado para @{bot.get('username', 'bot')} y guardado con permisos 0600.")
 
     if args.activate:
+        # Instala la plantilla portable antes de operar systemd; un clon puede
+        # vivir en cualquier ruta y una unidad activa debe reiniciarse para
+        # leer el token recién escrito.
+        from instalar_servicios import install_templates
+
+        install_templates(
+            services=("sincategorematico-bot.service",), desktops=()
+        )
+        reload_result = subprocess.run(
+            ["systemctl", "--user", "daemon-reload"], check=False
+        )
+        if reload_result.returncode != 0:
+            print("El token se guardó, pero systemd no pudo recargar unidades.", file=sys.stderr)
+            return reload_result.returncode
         result = subprocess.run(
-            ["systemctl", "--user", "enable", "--now", "sincategorematico-bot.service"],
+            ["systemctl", "--user", "enable", "sincategorematico-bot.service"],
             check=False,
         )
         if result.returncode != 0:
-            print("El token se guardó, pero systemd no pudo iniciar el servicio.", file=sys.stderr)
+            print("El token se guardó, pero systemd no pudo habilitar el servicio.", file=sys.stderr)
+            return result.returncode
+        result = subprocess.run(
+            ["systemctl", "--user", "restart", "sincategorematico-bot.service"],
+            check=False,
+        )
+        if result.returncode != 0:
+            print("El token se guardó, pero systemd no pudo reiniciar el servicio.", file=sys.stderr)
             return result.returncode
         time.sleep(1)
         active = subprocess.run(

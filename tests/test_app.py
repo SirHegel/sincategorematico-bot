@@ -4,10 +4,12 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from pathlib import Path
 import tempfile
+import time
 import unittest
 
 from sincategorematico_bot.app import BotApplication, Identity, parse_command
 from sincategorematico_bot.config import BotConfig
+from sincategorematico_bot.runtime import ENGINE_HEARTBEAT_TTL
 from sincategorematico_bot.storage import StateStore
 
 
@@ -99,6 +101,43 @@ class BotApplicationTests(unittest.TestCase):
         self.application.handle_update(private_update(123, "/status"))
         self.assertFalse(self.store.get_bool("publishing_paused"))
         self.assertIn("Estado: en línea", self.api.messages[-1][1])
+
+    def test_status_reports_stale_engine_heartbeat_and_uncertain_posts(self) -> None:
+        self.application.handle_update(private_update(123, f"/claim {self.claim_code}"))
+        draft_id = self.store.add_draft(
+            item_id=None, body="Texto", link=None, title="Incierto"
+        )
+        self.store.set_draft_state(draft_id, "uncertain")
+        self.store.set("engine_status", "activo")
+        self.store.set(
+            "engine_heartbeat_at", int(time.time()) - ENGINE_HEARTBEAT_TTL - 10
+        )
+
+        self.application.handle_update(private_update(123, "/status"))
+
+        status = self.api.messages[-1][1]
+        self.assertIn("SIN PULSO", status)
+        self.assertIn("inciertos: 1", status)
+
+    def test_owner_can_confirm_an_uncertain_post_without_retrying_it(self) -> None:
+        self.application.handle_update(private_update(123, f"/claim {self.claim_code}"))
+        draft_id = self.store.add_draft(
+            item_id=None, body="Texto", link=None, title="Incierto"
+        )
+        self.store.set_draft_state(draft_id, "uncertain")
+
+        self.application.handle_update(
+            private_update(
+                123,
+                f"/confirmar {draft_id} "
+                "https://www.linkedin.com/feed/update/urn:li:activity:123456789/",
+            )
+        )
+
+        draft = self.store.draft(draft_id)
+        self.assertEqual(draft["state"], "published")
+        self.assertEqual(draft["post_urn"], "urn:li:activity:123456789")
+        self.assertIn("sin repetir el POST", self.api.messages[-1][1])
 
 
 if __name__ == "__main__":

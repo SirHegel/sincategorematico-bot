@@ -13,6 +13,9 @@ from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .config import load_config
+from .engine import linkedin_ready
+from .linkedin import normalize_post_reference
+from .runtime import TIME_PATTERN, apply_defaults, snapshot
 from .storage import StateStore
 
 
@@ -69,15 +72,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 return
             store = StateStore(STATE)
             config = load_config(CONFIG)
-            payload = {
-                "authenticated": True,
-                "paused": store.get_bool("publishing_paused", default=True),
-                "owner": store.get_int("owner_user_id") is not None,
-                "initialized": store.get_bool("telegram_initialized"),
-                "max_posts": store.get_int("max_posts_per_day") or config.max_posts_per_day,
-                "timezone": store.get("timezone") or config.timezone,
-                "activity": store.recent_activity(),
-            }
+            apply_defaults(store, config)
+            payload = snapshot(store, config)
             store.close()
             self._json(payload)
             return
@@ -126,9 +122,69 @@ class DashboardHandler(BaseHTTPRequestHandler):
             store = StateStore(STATE)
             paused = action == "pause"
             store.set("publishing_paused", paused)
-            store.add_activity("control", f"Publicaciones {'pausadas' if paused else 'reanudadas'} desde panel web")
+            store.add_activity("control", f"Motor editorial {'pausado' if paused else 'reanudado'} desde panel web")
             store.close()
             self._json({"ok": True, "paused": paused})
+            return
+        if path == "/api/draft":
+            if not self._authenticated():
+                self._json({"error": "Sesión requerida"}, HTTPStatus.UNAUTHORIZED)
+                return
+            data = self._read_json()
+            action = str(data.get("action", ""))
+            if action not in {"approve", "reject", "retry", "confirm"}:
+                self._json({"error": "Acción inválida"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                draft_id = int(data.get("id", 0))
+            except (TypeError, ValueError):
+                self._json({"error": "Borrador inválido"}, HTTPStatus.BAD_REQUEST)
+                return
+            store = StateStore(STATE)
+            draft = store.draft(draft_id)
+            allowed = (
+                {"pending"}
+                if action in {"approve", "reject"}
+                else {"uncertain"}
+                if action == "confirm"
+                else {"failed", "uncertain"}
+            )
+            if draft is None or str(draft["state"]) not in allowed:
+                store.close()
+                self._json({"error": "Ese borrador no admite esa acción"}, HTTPStatus.CONFLICT)
+                return
+            if action == "confirm":
+                urn = normalize_post_reference(str(data.get("reference", "")))
+                if urn is None:
+                    store.close()
+                    self._json(
+                        {"error": "Pega una URN o URL válida de la publicación de LinkedIn"},
+                        HTTPStatus.BAD_REQUEST,
+                    )
+                    return
+                if not store.reconcile_draft_as_published(draft_id, urn):
+                    store.close()
+                    self._json(
+                        {"error": "El borrador cambió de estado; actualiza el panel"},
+                        HTTPStatus.CONFLICT,
+                    )
+                    return
+                state = "published"
+                detail = "conciliado como ya publicado sin repetir el envío"
+            elif action == "retry":
+                store.retry_draft(draft_id)
+                state = "approved"
+                detail = "repuesto manualmente tras verificación"
+            else:
+                state = "approved" if action == "approve" else "rejected"
+                store.set_draft_state(draft_id, state)
+                detail = "aprobado" if state == "approved" else "descartado"
+            store.add_activity(
+                "control",
+                f"Borrador #{draft_id} {detail} desde panel web",
+            )
+            store.close()
+            self._json({"ok": True, "state": state})
             return
         if path == "/api/settings":
             if not self._authenticated():
@@ -138,16 +194,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
             try:
                 max_posts = int(data.get("max_posts", 0))
                 timezone = str(data.get("timezone", "")).strip()
+                window_start = str(data.get("window_start", "07:30")).strip()
+                window_end = str(data.get("window_end", "20:30")).strip()
                 if not 1 <= max_posts <= 50:
+                    raise ValueError
+                if not TIME_PATTERN.match(window_start) or not TIME_PATTERN.match(window_end):
                     raise ValueError
                 ZoneInfo(timezone)
             except (TypeError, ValueError, ZoneInfoNotFoundError):
-                self._json({"error": "Usa un límite de 1 a 50 y una zona horaria válida"}, HTTPStatus.BAD_REQUEST)
+                self._json(
+                    {"error": "Revisa el límite (1 a 50), la franja (hh:mm) y la zona horaria"},
+                    HTTPStatus.BAD_REQUEST,
+                )
                 return
             store = StateStore(STATE)
             store.set("max_posts_per_day", max_posts)
             store.set("timezone", timezone)
-            store.add_activity("settings", f"Configuración actualizada: {max_posts} piezas/día · {timezone}")
+            store.set("publish_window_start", window_start)
+            store.set("publish_window_end", window_end)
+            store.set("approval_required", bool(data.get("approval_required", True)))
+            if not bool(data.get("dry_run", True)) and not linkedin_ready(store):
+                store.add_activity("settings", "Publicación real solicitada sin cuenta de LinkedIn")
+                store.close()
+                self._json(
+                    {"error": "Vincula LinkedIn antes de salir del modo simulación"},
+                    HTTPStatus.CONFLICT,
+                )
+                return
+            store.set("dry_run", bool(data.get("dry_run", True)))
+            store.add_activity(
+                "settings",
+                f"Configuración actualizada: {max_posts} piezas/día · {window_start}–{window_end} · {timezone}",
+            )
             store.close()
             self._json({"ok": True})
             return

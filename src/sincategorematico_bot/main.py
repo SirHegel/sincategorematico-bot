@@ -10,6 +10,7 @@ import time
 
 from .app import BotApplication
 from .config import load_config
+from .runtime import apply_defaults
 from .storage import StateStore
 from .telegram_api import TelegramAPI, TelegramAPIError
 
@@ -45,6 +46,7 @@ def run() -> None:
     claim_expires_at = int(claim_expires_raw) if claim_expires_raw else None
 
     store = StateStore(state_path)
+    apply_defaults(store, config)
     api = TelegramAPI(token, network_timeout=config.poll_timeout_seconds + 10)
     application = BotApplication(
         api=api,
@@ -84,6 +86,8 @@ def run() -> None:
                     application.handle_update(update)
                     offset = max(offset, update_id + 1)
                     store.set("next_update_offset", offset)
+                application.notify_pending_drafts()
+                application.notify_alerts()
             except TelegramAPIError as exc:
                 if exc.error_code == 401:
                     LOGGER.error("Token de Telegram inválido o revocado")

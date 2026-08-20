@@ -1,74 +1,219 @@
 # Sincategoremático Bot
 
-Servicio local y de bajo consumo para controlar por Telegram el futuro flujo de
-noticias, redacción y publicación. La primera versión implementa conexión segura,
-propietario único, estado y pausa global.
+Bot local para descubrir noticias, redactar borradores con una CLI de IA,
+aprobarlos por Telegram y publicarlos en LinkedIn con límites y horarios. Incluye
+un motor editorial independiente, un panel web ligado a `127.0.0.1` y una
+aplicación de escritorio. El estado y todas las credenciales viven fuera del
+repositorio.
 
-## Seguridad inicial
+## Principios de seguridad
 
-El token vive únicamente en
-`~/.config/sincategorematico-bot/bot.env`, con permisos `0600`. Nunca se guarda
-en este repositorio ni se imprime en los registros.
+- Una instalación nueva queda **pausada** y en **simulación**. No publica en
+  LinkedIn hasta que el propietario vincule una cuenta y active expresamente el
+  modo real.
+- Antes de enviar, el motor reserva el borrador en la base de datos. Si la
+  respuesta de LinkedIn se pierde o el proceso se interrumpe, queda como
+  `uncertain` y no se reintenta automáticamente: esto evita publicaciones
+  duplicadas.
+- Telegram acepta comandos de un único propietario vinculado mediante un código
+  local temporal.
+- La redacción recibe un entorno mínimo; no hereda los tokens de Telegram,
+  LinkedIn ni del panel.
+- Los servicios de systemd se ejecutan con aislamiento, límites de recursos y
+  permisos de escritura restringidos al estado local y, para el redactor, a la
+  sesión local de la CLI de IA.
 
-El código público y la configuración privada no se duplican en dos árboles que
-puedan desincronizarse: este repositorio contiene solamente código auditable;
-las credenciales y el estado de ejecución permanecen fuera de Git, en las rutas
-privadas del usuario indicadas arriba y en `~/.local/state/sincategorematico-bot/`.
+Los datos privados se guardan aquí:
 
-1. Revoca cualquier token que se haya compartido en mensajes.
-2. Genera un token nuevo con BotFather.
-3. Crea primero un código temporal para vincularte como propietario:
+- `~/.config/sincategorematico-bot/bot.env` — token de Telegram, clave del panel
+  y credenciales de la aplicación de LinkedIn; modo `0600`.
+- `~/.local/state/sincategorematico-bot/state.db` — propietario, borradores,
+  actividad y tokens OAuth de LinkedIn.
 
-   ```bash
-   cd /home/sirhegel/Documentos/Repos/sincategorematico-bot
-   python3 scripts/create_claim_code.py
-   ```
+No copies esos archivos al repositorio, a un issue ni a un registro público.
 
-4. Configura el token mediante entrada oculta e inicia el servicio:
+## Requisitos
 
-   ```bash
-   python3 scripts/configure_token.py --activate
-   ```
+- Linux con Python 3.11 o posterior y systemd de usuario.
+- Una cuenta de Telegram y un bot creado con BotFather.
+- La CLI de Claude 2.1.235 o posterior, instalada y autenticada localmente para redactar. Sin ella,
+  los paneles y Telegram funcionan, pero el motor no genera borradores.
+- Para publicar: una aplicación de LinkedIn con OAuth y el producto/permisos
+  correspondientes al perfil personal o a la organización elegida.
+- Tkinter es opcional y solo se necesita para la aplicación de escritorio.
 
-5. Abre `https://t.me/sincategorematicoln_bot`, pulsa **Start** y envía el
-   comando `/claim` mostrado por el script.
+## Instalación desde GitHub
 
-## Operación
+Clona en una ruta estable del usuario; no hacen falta rutas particulares ni
+editar los archivos de `deploy/`:
+
+```bash
+git clone https://github.com/SirHegel/sincategorematico-bot.git
+cd sincategorematico-bot
+python3 scripts/instalar_servicios.py --solo-renderizar --instalar-hook
+```
+
+El instalador sustituye `@PROJECT_ROOT@` y `@HOME@` en las plantillas y escribe
+archivos normales, de forma atómica, en:
+
+- `~/.config/systemd/user/`
+- `~/.local/share/applications/`
+
+No crea enlaces al clon. Instala unidades con modo `0644` y lanzadores con
+`0755`, sin heredar permisos accidentales del clon. El modo
+`--solo-renderizar` no recarga ni arranca servicios y sirve para inspeccionar el
+resultado antes de activarlo.
+
+Configura las piezas privadas en este orden:
+
+```bash
+# Entrada oculta; valida el token con Telegram y crea bot.env.
+python3 scripts/configure_token.py
+
+# Genera o conserva una clave local para http://127.0.0.1:8765.
+python3 scripts/configure_dashboard.py
+
+# Crea un /claim aleatorio que caduca en 24 horas.
+python3 scripts/create_claim_code.py
+
+# Opcional hasta que exista la aplicación OAuth de LinkedIn.
+python3 scripts/configure_linkedin.py
+
+# Renderiza de nuevo, recarga systemd y reinicia las tres unidades.
+python3 scripts/instalar_servicios.py --instalar-hook
+```
+
+Después, abre el bot en Telegram y envía exactamente el `/claim …` mostrado en
+la terminal. El código solo sirve una vez y su valor sin cifrar no se guarda.
+
+El instalador devuelve un código distinto de cero si falla el renderizado,
+`daemon-reload`, la habilitación, el reinicio o la comprobación de una unidad.
+Antes de reiniciar fuerza siempre `publishing_paused=true` y `dry_run=true`, aun
+si una base anterior estaba configurada para publicar en real.
+Una actualización normal se aplica así:
+
+```bash
+git pull --ff-only
+python3 scripts/instalar_servicios.py
+```
+
+## Vincular LinkedIn
+
+Registra primero una URL de retorno idéntica a esta en la aplicación de
+LinkedIn:
+
+```text
+http://localhost:8770/callback
+```
+
+Luego ejecuta:
+
+```bash
+# Perfil personal
+python3 scripts/configure_linkedin.py
+
+# Página de empresa; acepta el ID numérico o la URN completa
+python3 scripts/configure_linkedin.py --organizacion ID_DE_LA_ORGANIZACION
+```
+
+La herramienta pausa el motor y activa simulación antes de abrir OAuth. Usa un
+`state` aleatorio contra CSRF, escucha el retorno solo en
+localhost, intercambia el código y almacena los tokens en el estado privado. Si
+la aplicación no entrega un `refresh_token`, hay que repetir la vinculación
+antes de que caduque el acceso. `/linkedin` muestra si el autor, la expiración y
+los permisos siguen siendo utilizables.
+
+El cliente usa por defecto la versión `202607` de la API REST. Se puede cambiar
+sin modificar código agregando al archivo privado `bot.env` una versión válida
+`YYYYMM`, por ejemplo:
+
+```text
+SINCATEGOREMATICO_LINKEDIN_API_VERSION=202607
+```
+
+Mantén ese valor en una versión admitida por LinkedIn y reinicia el motor después
+de cambiarlo.
+
+## Flujo de publicación
+
+El arranque seguro combina dos controles distintos:
+
+- **Pausa:** `/pause` detiene ingesta, redacción y publicación. `/resume` vuelve
+  a habilitar el motor.
+- **Destino:** `/publicacion simulacion` conserva cualquier aprobado en la cola y
+  verifica el flujo sin enviar un POST. `/publicacion real` permite el envío solo
+  si OAuth, autor, permisos, horario, separación y límite diario son válidos.
+
+Secuencia recomendada para la primera puesta en marcha:
+
+1. Vincula Telegram y LinkedIn, pero conserva simulación y pausa.
+2. Usa `/resume`, revisa los borradores y aprueba uno.
+3. Comprueba la simulación en `/status` y en el panel.
+4. Activa `/publicacion real` únicamente cuando quieras enviar a LinkedIn.
+
+Estados importantes de un borrador:
+
+- `pending`: espera revisión.
+- `approved`: aprobado y todavía no enviado.
+- `publishing`: reserva durable tomada justo antes del envío.
+- `published`: LinkedIn confirmó un identificador de publicación.
+- `failed`: error definido, por ejemplo autorización rechazada.
+- `uncertain`: LinkedIn pudo haber recibido el POST, pero no existe confirmación
+  suficiente.
+
+Mientras exista un `uncertain`, la publicación real completa queda bloqueada.
+Después de revisar LinkedIn, usa `/confirmar N <URN_o_URL>` si el post sí existe:
+lo contabiliza sin repetir el POST. Usa `/reintentar N` solo si comprobaste que
+no existe. Los límites temporales (`429`) aplican una espera global a toda la
+cola; los errores ambiguos nunca se repiten solos.
+
+Telegram ofrece `/help`, `/status`, `/cola`, `/ver N`, `/tema …`, `/fuentes`,
+`/agregar`, `/quitar`, `/limite`, `/franja`, `/aprobacion`, `/publicacion`,
+`/linkedin`, `/pause`, `/resume`, `/reintentar N` y `/confirmar N <URN_o_URL>`.
+
+## Paneles y operación
+
+El panel web solo escucha en `http://127.0.0.1:8765`. Usa cookie `HttpOnly`,
+validación de origen, límite de intentos y una política CSP restrictiva. La clave
+del panel se muestra en la terminal al configurarlo y no aparece en el panel.
 
 ```bash
 systemctl --user status sincategorematico-bot.service
-journalctl --user -u sincategorematico-bot.service -f
-systemctl --user restart sincategorematico-bot.service
+systemctl --user status sincategorematico-engine.service
+systemctl --user status sincategorematico-dashboard.service
+journalctl --user -u sincategorematico-engine.service -f
+systemctl --user restart sincategorematico-engine.service
 ```
 
-## Paneles locales
+Bloquear la pantalla no detiene las unidades. Suspender, hibernar o apagar sí.
+Para mantener servicios de usuario después de cerrar sesión, un administrador
+puede habilitar `linger` para esa cuenta.
 
-El proyecto incluye dos interfaces que comparten el estado privado del bot:
+## Evitar secretos en Git
 
-- **Panel web local:** disponible únicamente en `http://127.0.0.1:8765`, con
-  autenticación, cookie `HttpOnly`, validación de origen, límite de intentos y
-  una política CSP restrictiva. No se expone a Internet.
-- **Aplicación de escritorio:** interfaz nativa instalada en el menú de
-  aplicaciones del computador como **Sincategoremático**.
-
-La clave del panel web vive junto al token de Telegram en el archivo privado
-`~/.config/sincategorematico-bot/bot.env`; no forma parte del repositorio. Para
-instalar o regenerar la configuración local:
+`.gitignore` excluye formatos privados frecuentes, pero no sustituye una revisión.
+El escáner incluido analiza contenido sin imprimir jamás la coincidencia:
 
 ```bash
-python3 scripts/configure_dashboard.py
+# Archivos preparados para el próximo commit (es lo que ejecuta el hook)
+tools/scan-secretos.sh --staged
+
+# Todo archivo versionado o no ignorado del árbol actual
+tools/scan-secretos.sh --todo
+
+# Activación manual del hook en este clon, si no se usó --instalar-hook
+git config core.hooksPath .githooks
 ```
 
-Ambas interfaces permiten consultar el estado, comprobar la vinculación del
-propietario, pausar o reanudar el flujo y revisar la actividad reciente. Nunca
-muestran el token de Telegram ni la clave del panel.
-
-Bloquear la pantalla no detiene el servicio. Suspender, hibernar o apagar el
-equipo sí lo detiene. Para que arranque antes de iniciar sesión se debe habilitar
-`linger` una sola vez.
+Si detecta una credencial real, retírala del índice y rótala. Borrarla en un
+commit posterior no la elimina de la historia ya publicada.
 
 ## Pruebas
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
+python3 -m py_compile scripts/*.py src/sincategorematico_bot/*.py
+node --check web/app.js
+tools/scan-secretos.sh --todo
+git diff --check
 ```

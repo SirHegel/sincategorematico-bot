@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import sys
+
+if sys.version_info < (3, 11):
+    raise RuntimeError("Sincategoremático requiere Python 3.11 o posterior")
+
 import tomllib
 
 

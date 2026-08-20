@@ -1,0 +1,49 @@
+[Unit]
+Description=Motor editorial Sincategoremático (ingesta, redacción y publicación)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=@PROJECT_ROOT@
+EnvironmentFile=@HOME@/.config/sincategorematico-bot/bot.env
+UnsetEnvironment=SINCATEGOREMATICO_TELEGRAM_TOKEN SINCATEGOREMATICO_CLAIM_SHA256 SINCATEGOREMATICO_CLAIM_EXPIRES_AT SINCATEGOREMATICO_DASHBOARD_TOKEN
+Environment=PYTHONPATH=@PROJECT_ROOT@/src
+Environment=SINCATEGOREMATICO_CONFIG_PATH=@PROJECT_ROOT@/config.toml
+Environment=SINCATEGOREMATICO_STATE_PATH=@HOME@/.local/state/sincategorematico-bot/state.db
+Environment=PATH=@HOME@/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=DISABLE_AUTOUPDATER=1
+Environment=DISABLE_TELEMETRY=1
+Environment=CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+ExecStart=/usr/bin/python3 -m sincategorematico_bot.engine
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=45
+UMask=0077
+Nice=10
+CPUQuota=150%
+MemoryHigh=1G
+MemoryMax=2G
+TasksMax=256
+LimitNOFILE=4096
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+# El estado del bot y la sesión de la CLI de Claude son los únicos puntos de escritura.
+ReadWritePaths=@HOME@/.local/state/sincategorematico-bot
+ReadWritePaths=-@HOME@/.claude
+ReadWritePaths=-@HOME@/.claude.json
+ReadWritePaths=-@HOME@/.claude.json.backup
+ReadWritePaths=-@HOME@/.cache/claude-cli-nodejs
+ReadWritePaths=-@HOME@/.local/state/claude
+ReadWritePaths=-@HOME@/.config/claude
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=default.target

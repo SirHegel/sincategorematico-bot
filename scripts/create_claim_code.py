@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from pathlib import Path
 import secrets
+import subprocess
 import sys
 
 
@@ -25,6 +26,20 @@ def main() -> int:
     write_environment(ENV_PATH, values)
     print("Código creado. Envíalo al bot antes de 24 horas:")
     print(f"/claim {code}")
+    result = subprocess.run(
+        ["systemctl", "--user", "try-restart", "sincategorematico-bot.service"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode:
+        print(
+            "No se pudo recargar el bot. Antes de enviar /claim ejecuta: "
+            "systemctl --user restart sincategorematico-bot.service",
+            file=sys.stderr,
+        )
+        return 1
+    print("El bot activo ya cargó el código; si estaba detenido, inícialo antes de usar /claim.")
     return 0
 
 

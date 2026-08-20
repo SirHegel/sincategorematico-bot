@@ -1,16 +1,16 @@
 [Unit]
 Description=Bot local Sincategoremático para Telegram
-Documentation=file:///home/sirhegel/Documentos/Repos/sincategorematico-bot/README.md
 StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
 Type=simple
-WorkingDirectory=/home/sirhegel/Documentos/Repos/sincategorematico-bot
-EnvironmentFile=/home/sirhegel/.config/sincategorematico-bot/bot.env
-Environment=PYTHONPATH=/home/sirhegel/Documentos/Repos/sincategorematico-bot/src
-Environment=SINCATEGOREMATICO_CONFIG_PATH=/home/sirhegel/Documentos/Repos/sincategorematico-bot/config.toml
-Environment=SINCATEGOREMATICO_STATE_PATH=/home/sirhegel/.local/state/sincategorematico-bot/state.db
+WorkingDirectory=@PROJECT_ROOT@
+EnvironmentFile=@HOME@/.config/sincategorematico-bot/bot.env
+UnsetEnvironment=SINCATEGOREMATICO_DASHBOARD_TOKEN SINCATEGOREMATICO_LINKEDIN_CLIENT_ID SINCATEGOREMATICO_LINKEDIN_CLIENT_SECRET
+Environment=PYTHONPATH=@PROJECT_ROOT@/src
+Environment=SINCATEGOREMATICO_CONFIG_PATH=@PROJECT_ROOT@/config.toml
+Environment=SINCATEGOREMATICO_STATE_PATH=@HOME@/.local/state/sincategorematico-bot/state.db
 ExecStart=/usr/bin/python3 -m sincategorematico_bot
 Restart=on-failure
 RestartSec=10
@@ -26,7 +26,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/sirhegel/.local/state/sincategorematico-bot
+ReadWritePaths=@HOME@/.local/state/sincategorematico-bot
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictSUIDSGID=true
 LockPersonality=true
