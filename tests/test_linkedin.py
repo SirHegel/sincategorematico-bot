@@ -80,8 +80,8 @@ class ConfigurationTests(unittest.TestCase):
     def test_the_current_default_api_version_is_used(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=True):
             client = LinkedInClient("token")
-        self.assertEqual(API_VERSION, "202607")
-        self.assertEqual(client._headers()["LinkedIn-Version"], "202607")
+        self.assertEqual(API_VERSION, "202608")
+        self.assertEqual(client._headers()["LinkedIn-Version"], "202608")
 
     def test_a_valid_environment_override_is_used(self) -> None:
         with mock.patch.dict(os.environ, {API_VERSION_ENV: "202701"}, clear=True):

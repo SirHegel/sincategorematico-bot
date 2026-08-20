@@ -177,12 +177,12 @@ la aplicación no entrega un `refresh_token`, hay que repetir la vinculación
 antes de que caduque el acceso. `/linkedin` muestra si el autor, la expiración y
 los permisos siguen siendo utilizables.
 
-El cliente usa por defecto la versión `202607` de la API REST. Se puede cambiar
+El cliente usa por defecto la versión `202608` de la API REST. Se puede cambiar
 sin modificar código agregando al archivo privado `bot.env` una versión válida
 `YYYYMM`, por ejemplo:
 
 ```text
-SINCATEGOREMATICO_LINKEDIN_API_VERSION=202607
+SINCATEGOREMATICO_LINKEDIN_API_VERSION=202608
 ```
 
 Mantén ese valor en una versión admitida por LinkedIn y reinicia el motor después
