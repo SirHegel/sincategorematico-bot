@@ -25,6 +25,7 @@ from .runtime import (
     load_rules,
     publication_gate,
 )
+from .runtime_paths import runtime_config_path, runtime_state_path
 from .sources import FeedError, fetch_feed
 from .storage import StateStore
 from .writer import ClaudeWriter, WriterAccountsUnavailable, WriterError
@@ -464,16 +465,8 @@ class Engine:
 
 
 def run() -> None:
-    project_root = Path(__file__).resolve().parents[2]
-    config_path = Path(
-        os.environ.get("SINCATEGOREMATICO_CONFIG_PATH", project_root / "config.toml")
-    )
-    state_path = Path(
-        os.environ.get(
-            "SINCATEGOREMATICO_STATE_PATH",
-            str(Path.home() / ".local/state/sincategorematico-bot/state.db"),
-        )
-    )
+    config_path = runtime_config_path()
+    state_path = runtime_state_path()
     engine_lock = acquire_engine_lock(state_path)
     try:
         _run_locked(config_path=config_path, state_path=state_path)

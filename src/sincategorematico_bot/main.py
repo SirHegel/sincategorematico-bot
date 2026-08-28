@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 import random
 import signal
 import threading
@@ -11,6 +10,7 @@ import time
 from .app import BotApplication
 from .config import load_config
 from .runtime import apply_defaults
+from .runtime_paths import runtime_config_path, runtime_state_path
 from .storage import StateStore
 from .telegram_api import TelegramAPI, TelegramAPIError
 
@@ -26,19 +26,8 @@ def required_env(name: str) -> str:
 
 
 def run() -> None:
-    project_root = Path(__file__).resolve().parents[2]
-    config_path = Path(
-        os.environ.get(
-            "SINCATEGOREMATICO_CONFIG_PATH",
-            str(project_root / "config.toml"),
-        )
-    )
-    state_path = Path(
-        os.environ.get(
-            "SINCATEGOREMATICO_STATE_PATH",
-            str(Path.home() / ".local/state/sincategorematico-bot/state.db"),
-        )
-    )
+    config_path = runtime_config_path()
+    state_path = runtime_state_path()
     config = load_config(config_path)
     token = required_env("SINCATEGOREMATICO_TELEGRAM_TOKEN")
     claim_sha256 = os.environ.get("SINCATEGOREMATICO_CLAIM_SHA256") or None

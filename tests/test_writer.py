@@ -261,6 +261,15 @@ class WriterAccountManifestTests(unittest.TestCase):
             with self.assertRaises(WriterConfigurationError):
                 load_claude_accounts()
 
+    def test_environment_cannot_redirect_the_writer_manifest(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {"SINCATEGOREMATICO_WRITERS_CONFIG": str(self.manifest)},
+            clear=False,
+        ):
+            with self.assertRaises(WriterConfigurationError):
+                load_claude_accounts()
+
     def test_relative_public_duplicate_and_symlinked_paths_fail_closed(self) -> None:
         invalid_entries = [
             [{"id": "first", "config_dir": "relative"}],

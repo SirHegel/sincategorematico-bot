@@ -15,6 +15,8 @@ import subprocess
 import tempfile
 import time
 
+from .runtime_paths import fixed_runtime_path
+
 LOGGER = logging.getLogger(__name__)
 
 MAX_POST_CHARACTERS = 2800
@@ -229,12 +231,15 @@ def load_claude_accounts(path: Path | None = None) -> tuple[ClaudeAccount, ...]:
     """Lee únicamente ids y rutas locales; nunca credenciales ni opciones del proveedor."""
 
     selected = path
-    configured = ""
+    configured = False
     if selected is None:
-        configured = os.environ.get("SINCATEGOREMATICO_WRITERS_CONFIG", "").strip()
-        if any(character in configured for character in ("\x00", "\n", "\r")):
-            raise WriterConfigurationError("La ruta del manifiesto de redactores no es válida")
-        selected = Path(configured).expanduser() if configured else DEFAULT_WRITERS_CONFIG_PATH
+        configured = "SINCATEGOREMATICO_WRITERS_CONFIG" in os.environ
+        try:
+            selected = fixed_runtime_path(
+                "SINCATEGOREMATICO_WRITERS_CONFIG", DEFAULT_WRITERS_CONFIG_PATH
+            )
+        except RuntimeError as exc:
+            raise WriterConfigurationError(str(exc)) from None
     if not selected.is_absolute():
         raise WriterConfigurationError("La ruta del manifiesto de redactores debe ser absoluta")
     try:

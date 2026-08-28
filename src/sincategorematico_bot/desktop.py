@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-import os
 from pathlib import Path
 import time
 import tkinter as tk
@@ -11,11 +10,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from .config import load_config
 from .linkedin import linkedin_credentials_usable, normalize_post_reference
 from .runtime import TIME_PATTERN, apply_defaults, snapshot
+from .runtime_paths import runtime_config_path, runtime_state_path
 from .storage import StateStore
 
 ROOT = Path(__file__).resolve().parents[2]
-STATE = Path(os.environ.get("SINCATEGOREMATICO_STATE_PATH", Path.home() / ".local/state/sincategorematico-bot/state.db"))
-CONFIG = Path(os.environ.get("SINCATEGOREMATICO_CONFIG_PATH", ROOT / "config.toml"))
+STATE = runtime_state_path()
+CONFIG = runtime_config_path()
 
 ESTADOS = {
     "pending": "por revisar",

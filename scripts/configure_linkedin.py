@@ -30,18 +30,14 @@ from sincategorematico_bot.linkedin import (  # noqa: E402
     exchange_code,
 )
 from sincategorematico_bot.runtime import apply_defaults  # noqa: E402
+from sincategorematico_bot.runtime_paths import runtime_state_path  # noqa: E402
 from sincategorematico_bot.storage import StateStore  # noqa: E402
 
 CLIENT_ID_KEY = "SINCATEGOREMATICO_LINKEDIN_CLIENT_ID"
 CLIENT_SECRET_KEY = "SINCATEGOREMATICO_LINKEDIN_CLIENT_SECRET"
 DEFAULT_PORT = 8770
 CLIENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9._~-]{3,200}$")
-STATE_PATH = Path(
-    os.environ.get(
-        "SINCATEGOREMATICO_STATE_PATH",
-        str(Path.home() / ".local/state/sincategorematico-bot/state.db"),
-    )
-)
+STATE_PATH = runtime_state_path()
 
 PAGE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
 <title>Sincategoremático</title></head><body style="font-family:system-ui;background:#080a15;color:#f5f6ff;

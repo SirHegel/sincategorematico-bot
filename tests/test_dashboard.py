@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from http import HTTPStatus
+from http.cookies import CookieError, SimpleCookie
 import io
 import json
 from pathlib import Path
@@ -20,7 +21,54 @@ class DashboardControlTests(unittest.TestCase):
         self.db_path = Path(self.directory.name) / "state.db"
 
     def tearDown(self) -> None:
+        DashboardHandler.active_sessions.clear()
+        DashboardHandler.failed_logins.clear()
         self.directory.cleanup()
+
+    def test_login_issues_an_opaque_server_session_not_the_master_key(self) -> None:
+        master_key = "dashboard-master-key-for-testing-only"
+        encoded = json.dumps({"token": master_key}).encode()
+        handler = DashboardHandler.__new__(DashboardHandler)
+        handler.path = "/api/login"
+        handler.headers = {"Content-Length": str(len(encoded))}
+        handler.rfile = io.BytesIO(encoded)
+        handler.wfile = io.BytesIO()
+        handler.client_address = ("127.0.0.1", 12345)
+        handler._same_origin = lambda: True
+        captured_headers: list[tuple[str, str]] = []
+        handler.send_response = lambda _status: None
+        handler.send_header = lambda name, value: captured_headers.append((name, value))
+        handler.end_headers = lambda: None
+
+        with mock.patch.object(dashboard_module, "SESSION_TOKEN", master_key):
+            handler.do_POST()
+
+        cookie_header = dict(captured_headers)["Set-Cookie"]
+        self.assertNotIn(master_key, cookie_header)
+        self.assertNotIn("\r", cookie_header)
+        self.assertNotIn("\n", cookie_header)
+        parsed = SimpleCookie(cookie_header)
+        session_identifier = parsed["sinc_session"].value
+        self.assertGreaterEqual(len(session_identifier), 32)
+        self.assertIn("HttpOnly", cookie_header)
+        self.assertIn("SameSite=Strict", cookie_header)
+
+        subsequent = DashboardHandler.__new__(DashboardHandler)
+        subsequent.headers = {"Cookie": f"sinc_session={session_identifier}"}
+        self.assertTrue(subsequent._authenticated())
+
+    def test_unknown_and_expired_session_cookies_are_rejected(self) -> None:
+        handler = DashboardHandler.__new__(DashboardHandler)
+        handler.headers = {"Cookie": "sinc_session=unknown"}
+        self.assertFalse(handler._authenticated())
+
+        DashboardHandler.active_sessions["expired"] = time.monotonic() - 1
+        handler.headers = {"Cookie": "sinc_session=expired"}
+        self.assertFalse(handler._authenticated())
+
+    def test_cookie_serializer_rejects_response_splitting_characters(self) -> None:
+        with self.assertRaises(CookieError):
+            DashboardHandler._session_cookie("fixture\r\nX-Injected: yes")
 
     def post(self, path: str, payload: dict[str, object]) -> tuple[object, int]:
         encoded = json.dumps(payload).encode()
