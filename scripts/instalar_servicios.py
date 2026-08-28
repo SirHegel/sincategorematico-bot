@@ -39,14 +39,10 @@ def force_safe_startup(
     sys.path.insert(0, str(PROJECT_ROOT / "src"))
     from sincategorematico_bot.config import load_config
     from sincategorematico_bot.runtime import apply_defaults
+    from sincategorematico_bot.runtime_paths import runtime_state_path
     from sincategorematico_bot.storage import StateStore
 
-    selected_state = state_path or Path(
-        os.environ.get(
-            "SINCATEGOREMATICO_STATE_PATH",
-            str(Path.home() / ".local/state/sincategorematico-bot/state.db"),
-        )
-    )
+    selected_state = state_path or runtime_state_path()
     selected_config = config_path or PROJECT_ROOT / "config.toml"
     store = StateStore(selected_state)
     try:

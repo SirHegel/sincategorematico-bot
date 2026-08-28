@@ -239,69 +239,75 @@ class SecretScannerTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
 
             # Se construye por partes para que esta prueba no se marque a sí misma.
-            secret = "123456789:" + "Ab3_defGhijKlmNopQrStuVwXyZ012345"
+            scanner_fixture = "123456789:" + "Ab3_defGhijKlmNopQrStuVwXyZ012345"
             exposed = directory / "exposed.txt"
-            exposed.write_text(f"telegram={secret}\n", encoding="utf-8")
+            exposed.write_text(f"telegram={scanner_fixture}\n", encoding="utf-8")
             self.run_git(directory, "add", "exposed.txt")
             result = self.run_scanner(directory, "--staged")
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("exposed.txt", result.stderr)
-            self.assertNotIn(secret, result.stdout + result.stderr)
+            self.assertNotIn(scanner_fixture, result.stdout + result.stderr)
 
     def test_worktree_scan_does_not_disclose_an_assigned_secret(self) -> None:
         with tempfile.TemporaryDirectory() as raw_directory:
             directory = Path(raw_directory)
             self.run_git(directory, "init", "--quiet")
-            secret = "MiClave" + "Segura_4829.ConMuchoEntropia"
+            scanner_fixture = "MiClave" + "Segura_4829.ConMuchoEntropia"
             candidate = directory / "settings.txt"
-            candidate.write_text(f'{{"client_secret": "{secret}"}}\n', encoding="utf-8")
+            candidate.write_text(
+                f'{{"client_secret": "{scanner_fixture}"}}\n', encoding="utf-8"
+            )
 
             result = self.run_scanner(directory, "--todo")
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("settings.txt", result.stderr)
-            self.assertNotIn(secret, result.stdout + result.stderr)
+            self.assertNotIn(scanner_fixture, result.stdout + result.stderr)
 
     def test_worktree_scan_blocks_a_hex_only_client_secret(self) -> None:
         with tempfile.TemporaryDirectory() as raw_directory:
             directory = Path(raw_directory)
             self.run_git(directory, "init", "--quiet")
-            secret = "abcdef01" * 4
+            scanner_fixture = "abcdef01" * 4
             candidate = directory / "credentials.env"
-            candidate.write_text(f"CLIENT_SECRET={secret}\n", encoding="utf-8")
+            candidate.write_text(
+                f"CLIENT_SECRET={scanner_fixture}\n", encoding="utf-8"
+            )
 
             result = self.run_scanner(directory, "--todo")
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("credentials.env", result.stderr)
-            self.assertNotIn(secret, result.stdout + result.stderr)
+            self.assertNotIn(scanner_fixture, result.stdout + result.stderr)
 
     def test_staged_scan_blocks_a_sixteen_character_client_secret(self) -> None:
         with tempfile.TemporaryDirectory() as raw_directory:
             directory = Path(raw_directory)
             self.run_git(directory, "init", "--quiet")
-            secret = "abcd" * 4
+            scanner_fixture = "abcd" * 4
             candidate = directory / "short-secret.env"
-            candidate.write_text(f"CLIENT_SECRET={secret}\n", encoding="utf-8")
+            candidate.write_text(
+                f"CLIENT_SECRET={scanner_fixture}\n", encoding="utf-8"
+            )
             self.run_git(directory, "add", "short-secret.env")
 
             result = self.run_scanner(directory, "--staged")
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("short-secret.env", result.stderr)
-            self.assertNotIn(secret, result.stdout + result.stderr)
+            self.assertNotIn(scanner_fixture, result.stdout + result.stderr)
 
     def test_staged_scan_inspects_a_blob_larger_than_ten_mib(self) -> None:
         with tempfile.TemporaryDirectory() as raw_directory:
             directory = Path(raw_directory)
             self.run_git(directory, "init", "--quiet")
-            secret = "abcdef01" * 4
+            scanner_fixture = "abcdef01" * 4
             candidate = directory / "large.bin"
             candidate.write_bytes(
                 b"A" * (10 * 1024 * 1024 + 1)
                 + b"\nCLIENT_SECRET="
-                + secret.encode("ascii")
+                + scanner_fixture.encode("ascii")
             )
             self.run_git(directory, "add", "large.bin")
 
@@ -309,16 +315,18 @@ class SecretScannerTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("large.bin", result.stderr)
-            self.assertNotIn(secret, result.stdout + result.stderr)
+            self.assertNotIn(scanner_fixture, result.stdout + result.stderr)
 
     def test_staged_scan_inspects_binary_blobs_with_nuls(self) -> None:
         with tempfile.TemporaryDirectory() as raw_directory:
             directory = Path(raw_directory)
             self.run_git(directory, "init", "--quiet")
-            secret = "MiSecreto" + "Binario" + "1234567890"
+            scanner_fixture = "MiSecreto" + "Binario" + "1234567890"
             candidate = directory / "payload.dat"
             candidate.write_bytes(
-                b"\x00\xff\x10CLIENT_SECRET=" + secret.encode("ascii") + b"\x00"
+                b"\x00\xff\x10CLIENT_SECRET="
+                + scanner_fixture.encode("ascii")
+                + b"\x00"
             )
             self.run_git(directory, "add", "payload.dat")
 
@@ -326,7 +334,7 @@ class SecretScannerTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("payload.dat", result.stderr)
-            self.assertNotIn(secret, result.stdout + result.stderr)
+            self.assertNotIn(scanner_fixture, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

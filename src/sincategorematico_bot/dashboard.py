@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import threading
 import time
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -16,20 +17,25 @@ from .config import load_config
 from .engine import linkedin_ready
 from .linkedin import normalize_post_reference
 from .runtime import TIME_PATTERN, apply_defaults, snapshot
+from .runtime_paths import runtime_config_path, runtime_state_path
 from .storage import StateStore
 
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ROOT / "web"
-STATE = Path(os.environ.get("SINCATEGOREMATICO_STATE_PATH", Path.home() / ".local/state/sincategorematico-bot/state.db"))
-CONFIG = Path(os.environ.get("SINCATEGOREMATICO_CONFIG_PATH", ROOT / "config.toml"))
+STATE = runtime_state_path()
+CONFIG = runtime_config_path()
 SESSION_TOKEN = os.environ.get("SINCATEGOREMATICO_DASHBOARD_TOKEN", "").strip()
 HOST, PORT = "127.0.0.1", int(os.environ.get("SINCATEGOREMATICO_DASHBOARD_PORT", "8765"))
+SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
+MAX_ACTIVE_SESSIONS = 128
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
     server_version = "SincategorematicoDashboard"
     failed_logins: dict[str, list[float]] = {}
+    active_sessions: dict[str, float] = {}
+    authentication_lock = threading.Lock()
 
     def log_message(self, format: str, *args: object) -> None:
         return
@@ -54,7 +60,48 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def _authenticated(self) -> bool:
         cookie = SimpleCookie(self.headers.get("Cookie", ""))
         supplied = cookie.get("sinc_session")
-        return bool(SESSION_TOKEN and supplied and hmac.compare_digest(supplied.value, SESSION_TOKEN))
+        if supplied is None:
+            return False
+        now = time.monotonic()
+        handler_type = type(self)
+        with handler_type.authentication_lock:
+            handler_type.active_sessions = {
+                identifier: expires_at
+                for identifier, expires_at in handler_type.active_sessions.items()
+                if expires_at > now
+            }
+            return handler_type.active_sessions.get(supplied.value, 0.0) > now
+
+    def _start_session(self) -> str:
+        """Crea una sesión opaca; la clave maestra nunca vuelve al navegador."""
+
+        now = time.monotonic()
+        identifier = secrets.token_urlsafe(32)
+        handler_type = type(self)
+        with handler_type.authentication_lock:
+            unexpired = sorted(
+                (
+                    (session_id, expires_at)
+                    for session_id, expires_at in handler_type.active_sessions.items()
+                    if expires_at > now
+                ),
+                key=lambda entry: entry[1],
+                reverse=True,
+            )[: MAX_ACTIVE_SESSIONS - 1]
+            handler_type.active_sessions = dict(unexpired)
+            handler_type.active_sessions[identifier] = now + SESSION_MAX_AGE_SECONDS
+        return identifier
+
+    @staticmethod
+    def _session_cookie(identifier: str) -> str:
+        cookie = SimpleCookie()
+        cookie["sinc_session"] = identifier
+        morsel = cookie["sinc_session"]
+        morsel["httponly"] = True
+        morsel["samesite"] = "Strict"
+        morsel["path"] = "/"
+        morsel["max-age"] = str(SESSION_MAX_AGE_SECONDS)
+        return morsel.OutputString()
 
     def _read_json(self) -> dict[str, object]:
         length = min(int(self.headers.get("Content-Length", "0")), 4096)
@@ -107,8 +154,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._json({"error": "Clave incorrecta"}, HTTPStatus.UNAUTHORIZED)
                 return
             self.failed_logins.pop(self.client_address[0], None)
+            session_identifier = self._start_session()
             self.send_response(HTTPStatus.NO_CONTENT)
-            self.send_header("Set-Cookie", f"sinc_session={SESSION_TOKEN}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800")
+            self.send_header("Set-Cookie", self._session_cookie(session_identifier))
             self.end_headers()
             return
         if path == "/api/control":
